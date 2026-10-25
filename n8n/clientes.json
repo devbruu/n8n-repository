@@ -1,0 +1,12 @@
+[
+  {"nome": "Ana Silva", "email": "ana@email.com", "saldo": "R$ 12.500,00", "perfil": "Conservador"},
+  {"nome": "Bruno Lima", "email": "bruno@email.com", "saldo": "R$ 3.200,00", "perfil": "Moderado"},
+  {"nome": "Carla Souza", "email": "carla@email.com", "saldo": "R$ 28.900,00", "perfil": "Arrojado"},
+  {"nome": "Daniel Rocha", "email": "daniel@email.com", "saldo": "R$ 800,00", "perfil": "Conservador"},
+  {"nome": "Elisa Martins", "email": "elisa@email.com", "saldo": "R$ 15.000,00", "perfil": "Moderado"},
+  {"nome": "Fábio Alves", "email": "fabio@email.com", "saldo": "R$ 52.300,00", "perfil": "Arrojado"},
+  {"nome": "Gabriela Nunes", "email": "gabriela@email.com", "saldo": "R$ 6.700,00", "perfil": "Conservador"},
+  {"nome": "Henrique Dias", "email": "henrique@email.com", "saldo": "R$ 9.400,00", "perfil": "Moderado"},
+  {"nome": "Isabela Costa", "email": "isabela@email.com", "saldo": "R$ 21.000,00", "perfil": "Arrojado"},
+  {"nome": "João Pereira", "email": "joao@email.com", "saldo": "R$ 1.500,00", "perfil": "Conservador"}
+]
