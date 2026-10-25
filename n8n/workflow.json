@@ -1,0 +1,254 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Clientes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        -240
+      ],
+      "id": "aeae5d8d-63a9-454d-830b-d469fe806658",
+      "name": "Webhook",
+      "webhookId": "361ef4a4-ee45-4975-826c-2e97a9cbc09d"
+    },
+    {
+      "parameters": {
+        "url": "https://github.com/devbruu/dio-lab-assistente-investimentos-rpa-n8n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -336,
+        -64
+      ],
+      "id": "8df9dd98-c0db-4794-92bd-ace673560c53",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const csvRaw = $json.data ?? $json.body ?? $json;\nconst text = (typeof csvRaw === \"string\") ? csvRaw : JSON.stringify(csvRaw);\n\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\nconst headers = lines[0].split(\",\").map(h => h.trim());\n\nconst investimentos = lines.slice(1).map(line => {\n  const cols = line.split(\",\").map(c => c.trim());\n  const obj = {};\n  headers.forEach((h, i) => obj[h] = cols[i] ?? \"\");\n\n  // normaliza minimo para número\n  obj.minimo = Number(String(obj.minimo).replace(/[^\\d]/g, \"\")) || 0;\n\n  return obj;\n});\n\nreturn [{ json: { investimentos } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -64
+      ],
+      "id": "a191b830-4b06-416b-9ede-b1328ebd9f85",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1200,
+        -32
+      ],
+      "id": "a209cb7b-8cdd-441b-83e7-7a7cb9f6594b",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        16,
+        -416
+      ],
+      "id": "f60744d1-7cbb-4422-a289-b88771ed1fac",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];\n\nconst resultados = $input.all().map((item, i) => {\n  // o webhook entrega os dados dentro de \"body\"\n  const dados = item.json.body ?? item.json;\n  const cliente = dados.cliente ?? \"Cliente\";\n  const assunto = dados.assunto ?? \"\";\n  const prioridade = dados.prioridade ?? \"normal\";\n\n  const protocolo = \"CH-\" + String(Date.now()).slice(-6) + i;\n\n  // regra simples: setor conforme palavras do assunto\n  const texto = assunto.toLowerCase();\n  let setor = \"Suporte geral\";\n  let motivo = \"assunto_geral\";\n  if (texto.includes(\"liga\") || texto.includes(\"tela\") || texto.includes(\"hardware\")) {\n    setor = \"Suporte de hardware\";\n    motivo = \"palavra_hardware\";\n  } else if (texto.includes(\"internet\") || texto.includes(\"rede\") || texto.includes(\"wifi\")) {\n    setor = \"Suporte de redes\";\n    motivo = \"palavra_rede\";\n  }\n\n  const mensagens = [\n    `Olá ${cliente}! Recebemos seu chamado (${protocolo}) sobre \"${assunto}\". Ele foi encaminhado para ${setor} com prioridade ${prioridade}.`,\n    `Oi ${cliente}! Seu chamado ${protocolo} está registrado: \"${assunto}\". Setor responsável: ${setor}. Prioridade: ${prioridade}.`,\n    `${cliente}, chamado ${protocolo} aberto. Assunto: \"${assunto}\". Vamos tratar com ${setor} (prioridade ${prioridade}).`\n  ];\n\n  return {\n    protocolo,\n    cliente,\n    assunto,\n    prioridade,\n    setor,\n    motivo,\n    mensagens,\n    mensagem_escolhida: pick(mensagens)\n  };\n});\n\nreturn [{\n  json: {\n    ok: true,\n    total_chamados: resultados.length,\n    resultados\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -176
+      ],
+      "id": "c699b53c-3245-47b6-9aeb-9fb3936e391a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultados = $json.resultados || [];\n\nfunction parseBRL(valor) {\n  if (!valor) return 0;\n  const s = String(valor)\n    .replace(\"R$\", \"\")\n    .replace(/\\./g, \"\")\n    .replace(\",\", \".\")\n    .replace(/[^\\d.]/g, \"\")\n    .trim();\n  const n = Number(s);\n  return Number.isFinite(n) ? n : 0;\n}\n\nconst out = resultados.map(c => {\n  const saldoNum = c.saldo_num ?? parseBRL(c.saldo_texto ?? c.saldo);\n\n  return {\n    json: {\n      email_to: String(c.email || \"\").trim(),\n      nome: String(c.nome || \"\").trim(),\n      perfil: c.perfil,\n      saldo_texto: c.saldo_texto ?? c.saldo,\n      saldo_num: saldoNum,\n      recomendacao: c.recomendacao,\n      motivo: c.motivo,\n      mensagem_base: c.mensagem_escolhida || c.mensagem || \"\",\n      copy_rules: {\n        idioma: \"pt-BR\",\n        tom: \"amigável e profissional\",\n        tamanho: \"curto (4-6 linhas)\",\n        evitar: [\"promessas de ganho\", \"garantias\", \"linguagem agressiva\"]\n      }\n    }\n  };\n});\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -176
+      ],
+      "id": "ed7465b4-86fd-4cae-abb9-2eb981a4ad5e",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Escreva um e-mail curto em pt-BR para o cliente abaixo, sem prometer ganhos e sem garantias \n\nCliente:\nNome: Maria Silva\nPerfil: Conservador\nSaldo: R$ 12.500,00\n\nRecomendação:\nProduto: CDB Liquidez Diária\nMínimo: 1000\nRentabilidade: 12.5%\nMotivo: saldo_ok\n\nRetorne APENAS JSON com:\n{\n   \"subject\": \"...\",\n   \"text_body\": \"...\",\n   \"html body\": \"...\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        -384
+      ],
+      "id": "81f4ee5d-f7dd-429e-a852-4b8e7d2df326",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "nca072xv8SiPJV9L",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const originais = $(\"Code in JavaScript2\").all().map(i => i.json);\n\n\nconst respostasIA = $input.all();\n\n\nfunction pegarTexto(item) {\n  const d = item.json;\n  return (\n    d.output ??\n    d.text ??\n    d.content?.parts?.[0]?.text ??\n    d.candidates?.[0]?.content?.parts?.[0]?.text ??\n    d.message?.content ??\n    \"\"\n  );\n}\n\n\nfunction lerJSON(texto) {\n  try {\n    const limpo = String(texto).replace(/```json|```/g, \"\").trim();\n    return JSON.parse(limpo);\n  } catch (e) {\n    return null;\n  }\n}\n\nconst out = respostasIA.map((item, i) => {\n  const j = originais[i] ?? {};\n  const ia = lerJSON(pegarTexto(item));\n\n  const to = j.email_to ?? j.email ?? \"\";\n  const subject = ia?.subject ?? `Uma recomendação para você, ${j.nome ?? \"\"}`;\n  const text_body = ia?.text_body ?? j.mensagem_base ?? \"\";\n  const html_body = ia?.html_body ?? `<p>${text_body}</p>`;\n\n  return {\n    json: {\n      ok: true,\n      to,\n      subject,\n      text_body,\n      html_body,\n\n      \n      meta: {\n        nome: j.nome,\n        perfil: j.perfil,\n        produto: j.recomendacao?.produto,\n        minimo: j.recomendacao?.minimo,\n        rentabilidade: j.recomendacao?.rentabilidade,\n        motivo: j.motivo\n      }\n    }\n  };\n});\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        -192
+      ],
+      "id": "3325a0c1-d299-4f4f-8dc3-a53195d58dc5",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e8b2f50a5aa30d6aea57468cd15ab133ac67c704b4844f17c2f8046b8970922a"
+  }
+}
